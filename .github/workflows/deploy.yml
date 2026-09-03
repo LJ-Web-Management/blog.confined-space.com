@@ -4,6 +4,15 @@ on:
   push:
     branches:
       - main
+  # The convert workflow commits the generated post + updated posts.json
+  # back to main using the default GITHUB_TOKEN, which GitHub deliberately
+  # does not let trigger a new `push` event (anti-recursion safeguard) - so
+  # without this, a deploy triggered by the upload commit races the convert
+  # workflow and ships the site *before* the new post exists.
+  workflow_run:
+    workflows: ["Convert Word Docs to Blog Posts"]
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
@@ -17,6 +26,9 @@ concurrency:
 
 jobs:
   deploy:
+    # Only skip when triggered by a *failed* conversion run - always deploy
+    # for a plain push or manual dispatch.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
